@@ -1,0 +1,64 @@
+# API keys and credentials
+.env
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Virtual environments
+venv/
+env/
+ENV/
+.env/
+.venv/
+gameworld/
+
+# Jupyter Notebooks
+.ipynb_checkpoints
+
+# PyCharm / VS Code
+.idea/
+.vscode/
+
+# Model / Data files
+*.pt
+*.pth
+*.h5
+*.pkl
+*.bin
+
+# Output directories
+output/
+outputs/
+results/
+logs/
+runs/
+
+# Simulation temporary files
+temp/
+tmp/
+*.png
+*.jpg
+*.gif
+*.mp4
+
+# Pygame specific
+*.avi
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Conda environment files
+environment.yml
+conda-meta/
+
+# Large data or model files
+*.npy
+*.npz

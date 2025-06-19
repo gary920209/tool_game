@@ -7,6 +7,7 @@ from ..world import *
 from ..constants import *
 from ..object import *
 from pygame.constants import *
+from PIL import Image
 #from .visualize_likelihoods import *
 import pdb
 __all__ = ['drawWorld', 'demonstrateWorld', 'demonstrateTPPlacement',
@@ -168,7 +169,7 @@ def demonstrateWorld(world, hz = 30.):
     running = True
     tps = 1./hz
     clk.tick(hz)
-    dispFinish = True
+    dispFinish = True        
     while running:
         world.step(tps)
         sc.blit(drawWorld(world), (0, 0))
@@ -182,6 +183,19 @@ def demonstrateWorld(world, hz = 30.):
             dispFinish = False
     pg.quit()
 
+def saveWorld(world, filename):
+    """
+    Save the world to a file in JSON format.
+    """
+    pg.init()
+    sc = pg.display.set_mode(world.dims)
+    sc.blit(drawWorld(world), (0, 0))
+    pg.image.save(sc, filename)
+    data = pg.image.tostring(sc, 'RGBA')
+    pil_img = Image.frombytes('RGBA', sc.get_size(), data)  
+    print(f"World saved to {filename}")
+    pg.quit()
+    return pil_img
 def demonstrateTPPlacement(toolpicker, toolname, position, maxtime=20.,
                            noise_dict=None, hz=30.):
     tps = 1./hz

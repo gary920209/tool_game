@@ -1,0 +1,11 @@
+cffi==1.17.1
+numpy==2.0.2
+pip==25.1.1
+pycparser==2.22
+PyExecJS==1.5.1
+pygame==2.6.1
+pymunk==5.7.0
+scipy==1.13.1
+setuptools==80.9.0
+six==1.17.0
+wheel==0.45.1
