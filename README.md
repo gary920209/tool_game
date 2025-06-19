@@ -1,6 +1,5 @@
 # Tool games for physical reasoning
-
-In this repository you will find:
+Original Repo: https://github.com/k-r-allen/tool-games
 
 * Python code to load levels, visualize levels, create levels, and simulate actions within levels ([environment/](https://github.com/k-r-allen/tool-games/tree/master/environment))
 * Level jsons used in the PNAS paper (in [environment/Trials](https://github.com/k-r-allen/tool-games/tree/master/environment/Trials))
