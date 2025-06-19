@@ -228,6 +228,7 @@ def demonstrateTPPlacement(toolpicker, toolname, position, maxtime=20.,
             if e.type == QUIT:
                 pg.quit()
                 return
+    pg.image.save(sc, "final_snapshot.png")  
     pg.quit()
 
 def visualizePath(worlddict, path, hz=30.):

@@ -1,56 +1,88 @@
-prompt_init = f"""
-You are a Phyre expert. You will be given an initial scene of a Phyre task.
-Your task is to analyze the scene (256*256 pixels) and provide a solution to the task.
-In this environment, all the objects fall under the influence of gravity, and the scene is a 2D representation of a physics simulation.
-The goal of the task is to make the green ball and the blue ball touch each other.
-You can reach the goal by placing a red ball in the scene.
-Your action should be a list of 3 floats, each in the range [0, 1], representing the action to take.
-The action should be in the format: [x, y, r], where:
-x: pixel of center of mass divided by SCENE_WIDTH (0 = left, 1 = right)
-y: pixel of center of mass divided by SCENE_HEIGHT (0 = bottom, 1 = top)
-r: radius of the red ball (0 = smallest allowed (2 pixels), 1 = largest allowed (32 pixels))
+prompt_init = """
+You are an expert in tool-based physical reasoning tasks using the pyGameWorld environment.
 
-You should first provide your analysis of the task, and then provide your action in a list.
+You will be given an initial scene of a 2D physics simulation. The environment is affected by gravity, and your goal is to solve the task by placing one tool into the scene.
+
+There are predefined tools you can choose from:
+- obj1: a long L-shaped tool
+- obj2: a diamond-shaped tool
+- obj3: a long flat rectangular plank
+
+Your task is to place one of these tools in a suitable position to move the blue ball into the green container
+
+The canvas is 600x600 pixels. The placement action is a pair of pixel coordinates: [x, y], where (0,0) is bottom-left and (600,600) is top-right. Tools should be placed in areas not overlapping with other objects or outside the scene.
+
+Your action should be in the following format:
+{
+  "toolname": "<tool_name>",         # choose from "obj1", "obj2", or "obj3"
+  "position": [x, y]                 # where to place the center of the tool, in pixel coordinates
+}
+
+First, describe your analysis of the scene: what is happening, what goal needs to be achieved, and what physical principles may help (e.g., gravity, momentum, lever).
+
+Then, propose your tool placement in the JSON format as described above.
 """
 
-prompt_check = f"""
-Let's draw the red ball in the scene.
-I will provide the image of the scene with the red ball placed at the position you predicted. Predicted action: <PREDICTED_ACTION>
-You should first focus on the new image and describe the position of the red ball in the scene.
-Then, does this placement of the red ball meet your expectations?
-You can summarize the strategy you used in the previous stage and evaluate that if the red ball was placed at where you predicted, would it achieve the goal of making the green ball and the blue ball touch each other.
-If yes, return the action in the format: [x, y, r] as you predicted in the previous round.
-If not, please adjust your action based on the analysis of the scene and provide a new action.
+
+prompt_check = """
+You previously placed the tool <PREDICTED_ACTION> in the scene.
+
+Now, I will show you the scene with that tool placement.
+
+Please:
+1. Describe what you observe in the new image.
+2. Reflect on your previous strategy: was your tool positioned correctly? Why or why not?
+3. If you think the tool placement was effective, return the same action.
+4. If not, propose a new action in the format:
+{
+  "toolname": "<tool_name>",         
+  "position": [x, y]                 
+}
 """
 
-prompt_invalid = f"""
-It seems that the predicted action <PREDICTED_ACTION> is invalid due the red ball being placed outside the scene or colliding with other objects.
-Please analyze the scene more carefully and provide a new action.
+prompt_invalid = """
+The predicted tool placement <PREDICTED_ACTION> is invalid — the tool may be outside the scene or overlapping with other objects.
+
+Please re-analyze the scene and propose a corrected tool placement.
+
+Your response should follow this format:
+{
+  "toolname": "<tool_name>",         
+  "position": [x, y]                 
+}
 """
 
-prompt_video = f"""
-Now, let's watch the video of the previous round.
-You will be given a recorded video of a Phyre task.
-In the video, the gravity is applied to the objects, and the scene is a 2D representation of a physics simulation.
-It seems that the red ball was placed at <PREDICTED_ACTION> in the previous round, but it did not achieve the goal.
-Your task is to analyze the previous video and provide a new solution to the task.
-Based the previous video, you should provide the reason for the failure and adjust your action accordingly.
+prompt_video = """
+You will be shown a video of the previous simulation round.
+
+The goal of the task is to solve a 2D physical challenge using a single tool placement. The simulation is affected by gravity and basic physics laws.
+
+In the previous round, the tool <PREDICTED_ACTION> was placed, but the goal was not achieved.
+
+Please analyze the simulation video and:
+1. Identify why the attempt failed.
+2. Adjust your strategy accordingly.
+3. Propose a new action in this format:
+{
+  "toolname": "<tool_name>",         
+  "position": [x, y]                 
+}
 """
 
-video_prompt = f"""
-You are a Phyre expert. You will be given a video of a Phyre task.
-Your task is to analyze the previous video and provide a new solution to the task.
-In this environment, all the objects fall under the influence of gravity, and the scene is a 2D representation of a physics simulation.
-The goal of the task is to make the green ball and the blue ball touch each other.
-You can reach the goal by placing a red ball in the scene.
+video_prompt = """
+You are an expert in tool-based physical reasoning in the pyGameWorld environment.
 
-In the previous prediction, the red ball was placed at <PREDICTED_ACTION>.
+You will be given a video of a physics simulation. The environment is influenced by gravity, and your task is to place one predefined tool to solve the challenge.
 
-Your action should be a list of 3 floats, each in the range [0, 1], representing the action to take.
-The action should be in the format: [x, y, r], where:
-x: pixel of center of mass divided by SCENE_WIDTH (0 = left, 1 = right)
-y: pixel of center of mass divided by SCENE_HEIGHT (0 = bottom, 1 = top)
-r: radius of the red ball (0 = smallest allowed (2 pixels), 1 = largest allowed (32 pixels))
+Previously, the tool <PREDICTED_ACTION> was used but failed.
 
-You should first provide your analysis of the task, and then adjust your action based on the previous video to achieve the goal.
+Analyze the video and determine:
+1. What went wrong?
+2. How can you correct it?
+
+Then, provide a new tool placement action in this format:
+{
+  "toolname": "<tool_name>",         
+  "position": [x, y]                 
+}
 """

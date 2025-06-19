@@ -14,7 +14,7 @@ from gemini_api import GeminiClient
 
 # Local modules
 from prompts import prompt_init, prompt_invalid, prompt_check, prompt_video
-from schemas import ActionSchema, ActionSchemaCheck, VideoActionSchema
+from schemas import ToolUseAction, ToolUseActionCheck, ToolUseVideoAction
 
 # Fix random seed for reproducibility
 random.seed(0)
@@ -62,6 +62,12 @@ def main(args):
     pgw_dict = pgw.toDict()
     # pgw_dict.setdefault('defaults', {'elasticity': 0.0, 'friction': 0.5, 'density': 1.0})
 
+    tools = {
+    "obj1" : [[[-30,-15],[-30,15],[30,15],[0,-15]]],
+    "obj2" : [[[-20,0],[0,20],[20,0],[0,-20]]],
+    "obj3" : [[[-40,-5],[-40,5],[40,5],[40,-5]]]
+    }
+
     '''
     # Save to a file
     # Can reload with loadFromDict function in pyGameWorld
@@ -70,13 +76,12 @@ def main(args):
         json.dump(pgw_dict, jfl)
     '''
     # Turn this into a toolpicker game
-    tp = ToolPicker({'world': pgw_dict, 'tools':{}})
+    tp = ToolPicker({'world': pgw_dict, 'tools':tools})
     pg.init()
     screen = pg.display.set_mode((600,600))
     screen.fill((255,255,255)) 
     # screen the initial image of the world
     image = saveWorld(pgw, image_filename)
-    
 
     # Configure the Gemini agent for inference
     agent = GeminiClient(upload_file=True, fps=3.0)
@@ -87,19 +92,23 @@ def main(args):
     result = agent.inference_image(
         image_filename,
         prompt,
-        schema=ActionSchema
+        schema=ToolUseAction
     )
-    print("Predicted action:", result['action'])
+    print("Predicted action:", result)
 
-#     # Convert action to numpy array and simulate it
-#     pred_action = np.array(result['action'], dtype=np.float32)
-#     print("Predicted action shape:", pred_action.shape)
-#     simulation = simulator.simulate_action(
-#         task_index,
-#         pred_action,
-#         need_images=True,
-#         need_featurized_objects=True
-#     )
+    toolname = result['toolname']
+    position = result['position']
+    print(f"Tool: {toolname}, Position: {position}")
+    path_dict, success, time_to_success = tp.observePlacementPath(
+        toolname=toolname,
+        position=position,
+        maxtime=20.
+    )
+    print("Action was successful?", success)
+    print("Paths:", path_dict)
+    print("Time to success:", time_to_success)
+    demonstrateTPPlacement(tp, toolname, position)
+
 
 #     # Log outcomes and save response
 #     solved, invalid = log_simulation_results(
