@@ -81,8 +81,7 @@ def main(args):
     screen = pg.display.set_mode((600,600))
     screen.fill((255,255,255)) 
     # screen the initial image of the world
-    image = saveWorld(pgw, image_filename)
-
+    image = saveWorld(pgw, image_filename, tools)
     # Configure the Gemini agent for inference
     agent = GeminiClient(upload_file=True, fps=3.0)
 
@@ -105,7 +104,7 @@ def main(args):
         maxtime=20.
     )
     print("Action was successful?", success)
-    print("Paths:", path_dict)
+    # print("Paths:", path_dict)
     print("Time to success:", time_to_success)
     demonstrateTPPlacement(tp, toolname, position)
 

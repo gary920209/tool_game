@@ -3,12 +3,12 @@ You are an expert in tool-based physical reasoning tasks using the pyGameWorld e
 
 You will be given an initial scene of a 2D physics simulation. The environment is affected by gravity, and your goal is to solve the task by placing one tool into the scene.
 
-There are predefined tools you can choose from:
+In the top-right corner of the image, you will see three predefined red tools displayed for reference. These are your only choices. Each tool has a label under it:
 - obj1: a long L-shaped tool
 - obj2: a diamond-shaped tool
 - obj3: a long flat rectangular plank
 
-Your task is to place one of these tools in a suitable position to move the blue ball into the green container
+Your task is to choose **one** of these tools, and place it somewhere in the main scene (not the top-right corner). You should carefully analyze the scene and use the tool's shape and physics to help the blue ball reach the green container.
 
 The canvas is 600x600 pixels. The placement action is a pair of pixel coordinates: [x, y], where (0,0) is bottom-left and (600,600) is top-right. Tools should be placed in areas not overlapping with other objects or outside the scene.
 

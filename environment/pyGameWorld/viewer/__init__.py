@@ -183,19 +183,48 @@ def demonstrateWorld(world, hz = 30.):
             dispFinish = False
     pg.quit()
 
-def saveWorld(world, filename):
+def _draw_tool(surface, tool_points, topleft, color=(255, 0, 0)):
+    """
+    Draw a polygon tool on a surface at a specific topleft position.
+    tool_points: [[[x1, y1], [x2, y2], ...]]
+    """
+    # Adjust the topleft position to account for the tool's size
+    topleft_adjusted = (topleft[0], topleft[1] + 35)
+    
+    for poly in tool_points:
+        shifted = [[pt[0] + topleft_adjusted[0], pt[1] + topleft_adjusted[1]] for pt in poly]
+        pg.draw.polygon(surface, color, shifted, width=0)
+        pg.draw.polygon(surface, (0, 0, 0), shifted, width=2)
+
+def saveWorld(world, filename,tools):
     """
     Save the world to a file in JSON format.
     """
     pg.init()
     sc = pg.display.set_mode(world.dims)
     sc.blit(drawWorld(world), (0, 0))
+        # If tools are provided, draw them in upper right
+    if tools:
+        margin = 10
+        tool_width = 80
+        tool_height = 60
+        font = pg.font.SysFont(None, 20)
+        i = 0
+        for toolname, toolpoints in tools.items():
+            x = world.dims[0] - tool_width - margin
+            y = margin + i * (tool_height + margin)
+            _draw_tool(sc, toolpoints, topleft=(x, y))
+            label = font.render(toolname, True, (0, 0, 0))
+            sc.blit(label, (x, y + tool_height + 2))
+            i += 1
+
     pg.image.save(sc, filename)
     data = pg.image.tostring(sc, 'RGBA')
     pil_img = Image.frombytes('RGBA', sc.get_size(), data)  
     print(f"World saved to {filename}")
     pg.quit()
     return pil_img
+
 def demonstrateTPPlacement(toolpicker, toolname, position, maxtime=20.,
                            noise_dict=None, hz=30.):
     tps = 1./hz
