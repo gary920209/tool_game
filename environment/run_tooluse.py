@@ -1,24 +1,26 @@
 #!/usr/bin/env python3
 """
-Run PHyre tasks with Gemini API to predict actions and evaluate simulations.
+Run a tool use task with Gemini-2.5-Pro to predict and refine actions.
 """
 import os
+import json
 import random
 import argparse
+from pyGameWorld.world import loadFromDict
 from pyGameWorld import PGWorld, ToolPicker
 from pyGameWorld.viewer import demonstrateTPPlacement, demonstrateWorld, saveWorld
 import numpy as np
-# from gemini_api import GeminiClient
 import pygame as pg
 from gemini_api import GeminiClient
 
-# Local modules
 from prompts import prompt_init, prompt_invalid, prompt_check, prompt_video
 from schemas import ToolUseAction, ToolUseActionCheck, ToolUseVideoAction
 
 # Fix random seed for reproducibility
 random.seed(0)
 
+# load the file
+JSON_FILE = './Trials/Original/Basic.json'
 
 def main(args):
     """
@@ -30,11 +32,9 @@ def main(args):
     """
     # Parse command-line arguments
     output_root = args.output_root
-    image_filename ="image.png"
-    # Construct experiment name and output directories
     exp_name = f"fold_task"
+    initial_image_filename = 'initial_image.png'
     print("Experiment name:", exp_name)
-
     base_dir = os.path.join(output_root, exp_name)
     os.makedirs(base_dir, exist_ok=True)
 
@@ -49,39 +49,25 @@ def main(args):
     os.makedirs(visuals_dir, exist_ok=True)
     os.makedirs(responses_dir, exist_ok=True)
 
-    # Make the basic world
-    pgw = PGWorld(dimensions=(600,600), gravity=200)
-    # Name, [left, bottom, right, top], color, density (0 is static)
-    pgw.addBox('Table', [0,0,300,200],(0,0,0),0)
-    # Name, points (counter-clockwise), width, color, density
-    pgw.addContainer('Goal', [[330,100],[330,5],[375,5],[375,100]], 10, (0,255,0), (0,0,0), 0)
-    # Name, position of center, radius, color, (density is 1 by default)
-    pgw.addBall('Ball',[100,215],15,(0,0,255))
-    # Sets up the condition that "Ball" must go into "Goal" and stay there for 2 seconds
-    pgw.attachSpecificInGoal("Goal","Ball",2.)
-    pgw_dict = pgw.toDict()
-    # pgw_dict.setdefault('defaults', {'elasticity': 0.0, 'friction': 0.5, 'density': 1.0})
+    # Load the world from a JSON file
+    with open(JSON_FILE, 'r') as f:
+        pgw_dict = json.load(f)
 
-    tools = {
-    "obj1" : [[[-30,-15],[-30,15],[30,15],[0,-15]]],
-    "obj2" : [[[-20,0],[0,20],[20,0],[0,-20]]],
-    "obj3" : [[[-40,-5],[-40,5],[40,5],[40,-5]]]
-    }
-
-    '''
-    # Save to a file
-    # Can reload with loadFromDict function in pyGameWorld
-
-    with open('basic_trial.json','w') as jfl:
-        json.dump(pgw_dict, jfl)
-    '''
     # Turn this into a toolpicker game
-    tp = ToolPicker({'world': pgw_dict, 'tools':tools})
+    tp = ToolPicker(pgw_dict)
+
+    # Initialize pygame and create a screen for visualization
     pg.init()
     screen = pg.display.set_mode((600,600))
     screen.fill((255,255,255)) 
+
+    # Load the world from the dictionary
+    world = loadFromDict(pgw_dict['world'])
+    tools = pgw_dict['tools']
+   
     # screen the initial image of the world
-    image = saveWorld(pgw, image_filename, tools)
+    image = saveWorld(world, initial_image_filename, tools)
+    
     # Configure the Gemini agent for inference
     agent = GeminiClient(upload_file=True, fps=3.0)
 
@@ -89,7 +75,7 @@ def main(args):
     prompt = prompt_init
 
     result = agent.inference_image(
-        image_filename,
+        initial_image_filename,
         prompt,
         schema=ToolUseAction
     )
@@ -98,13 +84,14 @@ def main(args):
     toolname = result['toolname']
     position = result['position']
     print(f"Tool: {toolname}, Position: {position}")
+    
+    # Simulate the action using the ToolPicker
     path_dict, success, time_to_success = tp.observePlacementPath(
         toolname=toolname,
         position=position,
         maxtime=20.
     )
     print("Action was successful?", success)
-    # print("Paths:", path_dict)
     print("Time to success:", time_to_success)
     demonstrateTPPlacement(tp, toolname, position)
 
