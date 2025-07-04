@@ -183,6 +183,49 @@ def demonstrateWorld(world, hz = 30.):
             dispFinish = False
     pg.quit()
 
+from PIL import Image
+import pygame as pg
+import os
+
+def demonstrateWorld_and_save_gif(world, gif_filename="simulation.gif", hz=30., max_frames=5):
+    pg.init()
+    sc = pg.display.set_mode(world.dims)
+    clk = pg.time.Clock()
+    tps = 1. / hz
+    frames = []
+
+    for frame_idx in range(max_frames):
+        world.step(tps)
+        sc.blit(drawWorld(world), (0, 0))
+        pg.display.flip()
+        clk.tick(hz)
+
+        # screen to PIL Image
+        raw_data = pg.image.tostring(sc, 'RGBA')
+        img = Image.frombytes('RGBA', sc.get_size(), raw_data)
+        frames.append(img.copy())
+
+        # if the goal is accomplished, break the loop
+        if world.checkEnd():
+            print("Goal accomplished at frame", frame_idx + 1)
+            break
+
+    pg.quit()
+
+    # save frames as a GIF
+    if frames:
+        frames[0].save(
+            gif_filename,
+            save_all=True,
+            append_images=frames[1:],
+            duration=int(1000 / hz),  # duration per frame in ms
+            loop=0
+        )
+        print(f"Simulation GIF saved to {gif_filename}")
+    else:
+        print("No frames to save.")
+
+
 def _draw_tool(surface, tool_points, topleft, color=(255, 0, 0)):
     """
     Draw a polygon tool on a surface at a specific topleft position.
@@ -225,7 +268,7 @@ def saveWorld(world, filename,tools):
     pg.quit()
     return pil_img
 
-def demonstrateTPPlacement(toolpicker, toolname, position, maxtime=20.,
+def demonstrateTPPlacement(toolpicker, toolname, position, path, maxtime=20.,
                            noise_dict=None, hz=30.):
     tps = 1./hz
     toolpicker.bts = tps
@@ -257,7 +300,7 @@ def demonstrateTPPlacement(toolpicker, toolname, position, maxtime=20.,
             if e.type == QUIT:
                 pg.quit()
                 return
-    pg.image.save(sc, "final_snapshot.png")  
+    pg.image.save(sc, path)  
     pg.quit()
 
 def visualizePath(worlddict, path, hz=30.):

@@ -16,10 +16,7 @@ from prompts import prompt_init, prompt_invalid, prompt_check, prompt_video
 from schemas import ActionSchema, ActionSchemaCheck, VideoActionSchema
 from utils import (
     save_image,
-    save_gif,
     save_json,
-    convert_to_np,
-    log_simulation_results,
 )
 
 # Fix random seed for reproducibility

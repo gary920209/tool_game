@@ -127,7 +127,7 @@ class GeminiClient:
 
         if isinstance(video_object, str) and os.path.isfile(video_object):
             video_path = video_object
-            video_file = self.client.files.upload(file=video_path, mime_type="video/mp4")
+            video_file = self.client.files.upload(file=video_path)
         
         elif isinstance(video_object, np.ndarray):
             # Ensure the video is in the correct format (e.g., a list of frames)
