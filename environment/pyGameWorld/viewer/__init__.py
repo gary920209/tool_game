@@ -233,6 +233,12 @@ def demonstrateTPPlacement(toolpicker, toolname, position, maxtime=20.,
         pth, ocm, etime, wd = toolpicker.runFullNoisyPath(toolname, position, maxtime, returnDict=True, **noise_dict)
     else:
         pth, ocm, etime, wd = toolpicker.observeFullPlacementPath(toolname, position, maxtime, returnDict=True)
+    
+    # Check if placement failed (wd is None)
+    if wd is None:
+        print("Tool placement failed - collision detected or invalid position")
+        return
+    
     world = loadFromDict(wd)
     print (ocm)
     pg.init()
