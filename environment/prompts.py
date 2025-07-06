@@ -15,6 +15,21 @@ Your task is to choose **one** of these rigid body tools, and place it somewhere
 
 The canvas is 600x600 pixels. The placement action is a pair of pixel coordinates: [x, y], where (0,0) is bottom-left and (600,600) is top-right. Tools should be placed in areas not overlapping with other objects or outside the scene.
 
+**World Description:**
+"world": {
+    "defaults": {"density": 1, "friction": 0.5, "elasticity": 0.5, "color": "black", "bk_color": "white"}, 
+    "objects": {
+        "_LeftWall": {"type": "Poly", "color": "black", "density": 0, "vertices": [[-1, -1], [-1, 601], [1, 601], [1, -1]]}, 
+        "_BottomWall": {"type": "Poly", "color": "black", "density": 0, "vertices": [[-1, -1], [-1, 1], [601, 1], [601, -1]]}, 
+        "_RightWall": {"type": "Poly", "color": "black", "density": 0, "vertices": [[599, -1], [599, 601], [601, 601], [601, -1]]}, 
+        "_TopWall": {"type": "Poly", "color": "black", "density": 0, "vertices": [[-1, 599], [-1, 601], [601, 601], [601, 599]]}, 
+        "Table": {"type": "Poly", "color": "black", "density": 0, "vertices": [[0, 0], [0, 200], [300, 200], [300, 0]]}, 
+        "Goal": {"type": "Container", "color": "black", "density": 0, "points": [[330, 100], [330, 5], [375, 5], [375, 100]], "width": 10, "innerColor": "green", "outerColor": "black"}, 
+        "Ball": {"type": "Ball", "color": "red", "density": 1, "position": [100, 215], "radius": 15}
+    }
+}
+
+
 Your action should be in the following format:
 {
   "analysis": "<analysis>",          # describe the reason why you choose this tool and where to place it
@@ -55,6 +70,19 @@ You previously placed the rigid body tool <PREDICTED_ACTION> in the scene, but t
 
 The images you are seeing show the COMPLETE SIMULATION PROCESS from start to finish after your rigid body tool placement. These images capture key moments throughout the physics simulation, showing how the ball moved, interacted with your tool, and where it ended up.
 
+**World Description:**
+"world": {
+    "defaults": {"density": 1, "friction": 0.5, "elasticity": 0.5, "color": "black", "bk_color": "white"}, 
+    "objects": {
+        "_LeftWall": {"type": "Poly", "color": "black", "density": 0, "vertices": [[-1, -1], [-1, 601], [1, 601], [1, -1]]}, 
+        "_BottomWall": {"type": "Poly", "color": "black", "density": 0, "vertices": [[-1, -1], [-1, 1], [601, 1], [601, -1]]}, 
+        "_RightWall": {"type": "Poly", "color": "black", "density": 0, "vertices": [[599, -1], [599, 601], [601, 601], [601, -1]]}, 
+        "_TopWall": {"type": "Poly", "color": "black", "density": 0, "vertices": [[-1, 599], [-1, 601], [601, 601], [601, 599]]}, 
+        "Table": {"type": "Poly", "color": "black", "density": 0, "vertices": [[0, 0], [0, 200], [300, 200], [300, 0]]}, 
+        "Goal": {"type": "Container", "color": "black", "density": 0, "points": [[330, 100], [330, 5], [375, 5], [375, 100]], "width": 10, "innerColor": "green", "outerColor": "black"}, 
+        "Ball": {"type": "Ball", "color": "red", "density": 1, "position": [100, 215], "radius": 15}
+
+**Detailed Description:**
 Please analyze this complete simulation sequence:
 1. What happened to the red ball throughout the simulation? Did it collide with your rigid body tool as intended?
 2. If the collision did not happen, try to modified the rigid body tool placement (maybe replace it more to the left or right) to make it collide with the ball.
@@ -76,8 +104,25 @@ Think about:
 """
 
 prompt_invalid = """
-The predicted rigid body tool placement <PREDICTED_ACTION> is invalid — the rigid body tool may be outside the scene or overlapping with other objects on the scene.
+**MAIN TASK:**
+Your goal is to help a red ball reach a green container by placing one rigid body tool in the scene. The ball starts in a static (stationary) position, and you need to strategically place a rigid tool over the ball to collide with the ball and direct its path to the goal container.
 
+**World Description:**
+"world": {
+    "defaults": {"density": 1, "friction": 0.5, "elasticity": 0.5, "color": "black", "bk_color": "white"}, 
+    "objects": {
+        "_LeftWall": {"type": "Poly", "color": "black", "density": 0, "vertices": [[-1, -1], [-1, 601], [1, 601], [1, -1]]}, 
+        "_BottomWall": {"type": "Poly", "color": "black", "density": 0, "vertices": [[-1, -1], [-1, 1], [601, 1], [601, -1]]}, 
+        "_RightWall": {"type": "Poly", "color": "black", "density": 0, "vertices": [[599, -1], [599, 601], [601, 601], [601, -1]]}, 
+        "_TopWall": {"type": "Poly", "color": "black", "density": 0, "vertices": [[-1, 599], [-1, 601], [601, 601], [601, 599]]}, 
+        "Table": {"type": "Poly", "color": "black", "density": 0, "vertices": [[0, 0], [0, 200], [300, 200], [300, 0]]}, 
+        "Goal": {"type": "Container", "color": "black", "density": 0, "points": [[330, 100], [330, 5], [375, 5], [375, 100]], "width": 10, "innerColor": "green", "outerColor": "black"}, 
+        "Ball": {"type": "Ball", "color": "red", "density": 1, "position": [100, 215], "radius": 15}
+    }
+}
+
+**Detailed Description:**
+The predicted rigid body tool placement <PREDICTED_ACTION> is invalid — the rigid body tool may be outside the scene or overlapping with other objects on the scene.
 Please re-analyze the scene and propose a corrected rigid body tool placement, modified the position of the tool to the left or right or up or down.
 
 Your response should follow this format:

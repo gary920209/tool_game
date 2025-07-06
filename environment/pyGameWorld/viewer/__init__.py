@@ -307,6 +307,28 @@ def makeImageArray(worlddict, path, sample_ratio=1):
         nsteps = len(path[list(path.keys())[0]])
 
     for i in range(1,nsteps,sample_ratio):
+        # Check if all objects are static (positions and rotations haven't changed)
+        all_static = True
+        for onm, o in world.objects.items():
+            if not o.isStatic():
+                if len(path[onm])==2:
+                    # Compare current position and rotation with previous ones
+                    if (path[onm][0][i] != path[onm][0][i-1] or 
+                        path[onm][1][i] != path[onm][1][i-1]):
+                        all_static = False
+                        break
+                else:
+                    # Compare current position and rotation with previous ones
+                    if (path[onm][i][0:2] != path[onm][i-1][0:2] or 
+                        path[onm][i][2] != path[onm][i-1][2]):
+                        all_static = False
+                        break
+        
+        # If all objects are static, break out of the loop
+        if all_static:
+            print("All objects are static, breaking out of the loop")
+            break
+            
         for onm, o in world.objects.items():
             if not o.isStatic():
                 if len(path[onm])==2:

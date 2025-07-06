@@ -391,7 +391,7 @@ if __name__ == "__main__":
     parser.add_argument(
         '--max_time',
         type=float,
-        default=3.0,
+        default=50.0,
         help='Maximum simulation time in seconds'
     )
     
