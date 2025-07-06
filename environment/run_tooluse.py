@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Run a tool use task with Gemini-2.5-Pro to predict and refine actions.
+Run a tool use task with AI models to predict and refine actions.
 """
 import os
 import json
@@ -14,8 +14,8 @@ import pygame as pg
 from gemini_api import GeminiClient
 from openai_api import OpenAIClient
 
-from prompts import prompt_init, prompt_invalid, prompt_check, prompt_video, prompt_feedback, prompt_video_feedback
-from schemas import ToolUseAction, ToolUseActionCheck, ToolUseVideoAction
+from prompts import prompt_init, prompt_invalid, prompt_check, prompt_feedback
+from schemas import ToolUseAction, ToolUseActionCheck
 
 # Fix random seed for reproducibility
 random.seed(0)
@@ -34,46 +34,18 @@ def pygame_surface_to_numpy(surface):
     return pixel_data
 
 def save_simulation_images(images, attempt, visuals_dir):
-    """Save only the final simulation image for feedback"""
-    # Return the final image for feedback
-    final_img = images[-1] if images else None
-    if final_img:
-        final_img_path = os.path.join(visuals_dir, f'attempt_{attempt:03d}_final.png')
-        pg.image.save(final_img, final_img_path)
-        return final_img_path
+    """Save all simulation images for feedback"""
+    saved_images = []
+    if images:
+        for i, img in enumerate(images):
+            img_path = os.path.join(visuals_dir, f'attempt_{attempt:03d}_frame_{i:03d}.png')
+            pg.image.save(img, img_path)
+            saved_images.append(img_path)
+        print(f"Saved {len(saved_images)} simulation images for attempt {attempt}")
     
-    return None
+    return saved_images
 
-def create_simulation_video(images, attempt, visuals_dir, fps=10):
-    """Create video from simulation images and return video path"""
-    if not images:
-        return None
-    
-    import cv2
-    
-    # Convert pygame surfaces to numpy arrays
-    frames = []
-    for img in images:
-        # Convert pygame surface to numpy array
-        pixel_data = pg.surfarray.array3d(img)
-        # Convert from (width, height, 3) to (height, width, 3)
-        pixel_data = np.transpose(pixel_data, (1, 0, 2))
-        # Convert to BGR for OpenCV
-        pixel_data = cv2.cvtColor(pixel_data, cv2.COLOR_RGB2BGR)
-        frames.append(pixel_data)
-    
-    # Create video
-    video_path = os.path.join(visuals_dir, f'attempt_{attempt:03d}_simulation.mp4')
-    height, width, _ = frames[0].shape
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out = cv2.VideoWriter(video_path, fourcc, fps, (width, height))
-    
-    for frame in frames:
-        out.write(frame)
-    
-    out.release()
-    print(f"Simulation video saved to: {video_path}")
-    return video_path
+
 
 def main(args):
     """
@@ -86,7 +58,8 @@ def main(args):
     # Parse command-line arguments
     output_root = args.output_root
     max_attempts = args.max_attempts
-    use_video_feedback = args.use_video_feedback
+    max_inference_images = args.max_inference_images
+    max_time = args.max_time
     exp_name = f"fold_task"
     initial_image_filename = 'initial_image.png'
     print("Experiment name:", exp_name)
@@ -125,9 +98,9 @@ def main(args):
     
     # Configure the agent for inference
     if args.model == 'gemini':
-        agent = GeminiClient(upload_file=True, fps=3.0)
+        agent = GeminiClient(upload_file=True, fps=1.0)
     elif args.model == 'openai':
-        agent = OpenAIClient(upload_file=False, fps=3.0)
+        agent = OpenAIClient(upload_file=False, fps=1.0)
     else:
         raise ValueError(f"Invalid model: {args.model}")
 
@@ -136,8 +109,7 @@ def main(args):
     solved = False
     invalid_action = False
     last_action = None
-    use_video = False
-    
+
     print(f"Starting tool use task with maximum {max_attempts} attempts")
     print("=" * 50)
 
@@ -149,63 +121,59 @@ def main(args):
         if attempt == 1:
             # First attempt: use initial prompt
             prompt = prompt_init
-            current_image = initial_image_filename
+            current_images = [initial_image_filename]
             schema = ToolUseAction
             history = False
-            use_video = False
         elif invalid_action and last_action is not None:
             # Previous action was invalid: use invalid action prompt
             prompt = prompt_invalid.replace('<PREDICTED_ACTION>', str(last_action))
-            current_image = initial_image_filename
+            current_images = [initial_image_filename]
             schema = ToolUseAction
             history = True
-            use_video = False
         elif last_action is not None:
-            # Previous action was valid but didn't solve: use feedback prompt with simulation result
-            if use_video_feedback and 'last_simulation_video' in locals():
-                # Use video feedback
-                prompt = prompt_video_feedback.replace('<PREDICTED_ACTION>', str(last_action))
-                current_video = last_simulation_video
-                schema = ToolUseVideoAction
-                history = True
-                use_video = True
-            else:
-                # Use image feedback
-                prompt = prompt_feedback.replace('<PREDICTED_ACTION>', str(last_action))
-                # Ensure we have a valid image file
-                if 'last_simulation_final_image' in locals() and last_simulation_final_image is not None and os.path.exists(last_simulation_final_image):
-                    current_image = last_simulation_final_image
-                else:
-                    current_image = initial_image_filename
-                schema = ToolUseAction
-                history = True
-                use_video = False
+            # Previous action was valid but didn't solve: use feedback prompt with all simulation images
+            prompt = prompt_feedback.replace('<PREDICTED_ACTION>', str(last_action))
+            # Use all simulation images from previous attempts plus the initial image
+            current_images = saved_simulation_images
+            schema = ToolUseAction
+            history = True
         else:
             # Fallback for unexpected state
             prompt = prompt_init
-            current_image = initial_image_filename
+            current_images = [initial_image_filename]
             schema = ToolUseAction
             history = False
-            use_video = False
+
+        # Limit the number of images sent to the AI model
+        if len(current_images) > max_inference_images:
+            print(f"Limiting images from {len(current_images)} to {max_inference_images}")
+            # Select images evenly distributed across the whole process
+            if initial_image_filename in current_images:
+                # Keep initial image and select evenly distributed simulation images
+                other_images = [img for img in current_images if img != initial_image_filename]
+                if len(other_images) > 0:
+                    # Calculate step size to distribute images evenly
+                    step_size = len(other_images) / (max_inference_images - 1)
+                    selected_indices = [int(i * step_size) for i in range(max_inference_images - 1)]
+                    selected_images = [other_images[i] for i in selected_indices]
+                    current_images = [initial_image_filename] + selected_images
+                else:
+                    current_images = [initial_image_filename]
+            else:
+                # Select images evenly distributed across all images
+                step_size = len(current_images) / max_inference_images
+                selected_indices = [int(i * step_size) for i in range(max_inference_images)]
+                current_images = [current_images[i] for i in selected_indices]
 
         # Get prediction from the agent
         print(f"Getting prediction for attempt {attempt}...")
-        if use_video:
-            # Use video inference
-            result = agent.inference_video(
-                current_video,
-                prompt,
-                schema=schema,
-                history=history
-            )
-        else:
-            # Use image inference
-            result = agent.inference_image(
-                current_image,
-                prompt,
-                schema=schema,
-                history=history
-            )
+        print(f"Current images length: {len(current_images)}")
+        result = agent.inference_image(
+            current_images,
+            prompt,
+            schema=schema,
+            history=history
+        )
         
         if result is None:
             print("Failed to get prediction from agent")
@@ -239,13 +207,12 @@ def main(args):
         last_action = result
         
         print(f"Tool: {toolname}, Position: {position}")
-        
         # Simulate the action using the ToolPicker
         print("Simulating action...")
         path_dict, success, time_to_success, world_dict = tp.observeFullPlacementPath(
             toolname=toolname,
             position=position,
-            maxtime=5.,
+            maxtime=max_time,
             returnDict=True
         )
 
@@ -257,22 +224,17 @@ def main(args):
         simulation_images = []
         if path_dict is not None and len(path_dict) > 0:
             # Generate image sequence from the simulation path
-            simulation_images = makeImageArray(world_dict, path_dict, sample_ratio=1)
+            simulation_images = makeImageArray(world_dict, path_dict, sample_ratio=10)
             print(f"Captured {len(simulation_images)} simulation frames")
         else:
             print("No path data available for image generation")
             
-        # Save final simulation image
-        last_simulation_final_image = save_simulation_images(simulation_images, attempt, visuals_dir)
+        # Save all simulation images
+        saved_simulation_images = save_simulation_images(simulation_images, attempt, visuals_dir)
         
         # Always create video from simulation images
         if simulation_images:
-            print(f"Creating video for attempt {attempt}")
-            last_simulation_video = create_simulation_video(simulation_images, attempt, visuals_dir)
-        
-        # Convert final image to numpy array for AI feedback
-        if last_simulation_final_image:
-            final_surface = pg.image.load(last_simulation_final_image)
+            final_surface = simulation_images[-1]  # Use the last simulation image
             final_numpy = pygame_surface_to_numpy(final_surface)
             # Save numpy array for AI processing
             np.save(os.path.join(visuals_dir, f'attempt_{attempt:03d}_final.npy'), final_numpy)
@@ -289,9 +251,8 @@ def main(args):
             'time_to_success': time_to_success,
             'path_dict': path_dict,
             'num_simulation_frames': len(simulation_images) if simulation_images else 0,
-            'simulation_final_image': last_simulation_final_image if 'last_simulation_final_image' in locals() else None,
-            'simulation_video': last_simulation_video if 'last_simulation_video' in locals() else None,
-            'used_video_feedback': use_video_feedback
+            'saved_simulation_images': saved_simulation_images if 'saved_simulation_images' in locals() else [],
+            'total_simulation_images': len(saved_simulation_images)
         }
         
         with open(os.path.join(responses_dir, f'attempt_{attempt:03d}.json'), 'w') as f:
@@ -369,18 +330,7 @@ def main(args):
 #             print("Checked action:", result['action'])
 #             checked = result.get('correct', False)
 
-#         # If still not solved but was previously checked, try a video prompt for more context
-#         elif not solved and not invalid and checked:
-#             prompt = prompt_video.replace('<PREDICTED_ACTION>', str(pred_action))
-#             save_gif(simulation.images, path=os.path.join(visuals_dir, f'round_{count}.gif'))
-#             result = agent.inference_video(
-#                 convert_to_np(simulation.images),
-#                 prompt,
-#                 schema=VideoActionSchema,
-#                 history=True
-#             )
-#             print("Video-based action:", result['action'])
-#             checked = False
+
 
 #         # Update prediction and re-simulate
 #         pred_action = np.array(result['action'], dtype=np.float32)
@@ -429,13 +379,21 @@ if __name__ == "__main__":
     parser.add_argument(
         '--max_attempts',
         type=int,
-        default=100,
+        default=5,
         help='Maximum number of attempts to solve the task'
     )
     parser.add_argument(
-        '--use_video_feedback',
-        action='store_true',
-        help='Use video feedback instead of final image for failed attempts'
+        '--max_inference_images',
+        type=int,
+        default=5,
+        help='Maximum number of images to send to the AI model for inference'
     )
+    parser.add_argument(
+        '--max_time',
+        type=float,
+        default=3.0,
+        help='Maximum simulation time in seconds'
+    )
+    
     args = parser.parse_args()
     main(args)

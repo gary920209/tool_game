@@ -21,7 +21,7 @@ if not OPENAI_API_KEY:
 
 class OpenAIClient:
     def __init__(
-        self, api_key=OPENAI_API_KEY, upload_file=False, model="gpt-4o", fps=30.0
+        self, api_key=OPENAI_API_KEY, upload_file=False, model="gpt-4o-mini", fps=30.0
     ):
         self.client = OpenAI(api_key=api_key)
         self.model = model
@@ -182,7 +182,7 @@ class OpenAIClient:
             "model": self.model,
             "messages": messages,
             "max_tokens": 4096,
-            "temperature": 0.3
+            "temperature": 0.1
         }
         
         # Add response format if schema is provided
@@ -241,21 +241,32 @@ class OpenAIClient:
             print("OpenAI doesn't support image upload, please set upload_file=False")
             return None
         else:
-            image_base64 = self.encode_image(image_object)
-            image_content = {
-                "type": "image_url",
-                "image_url": {
-                    "url": f"data:image/png;base64,{image_base64}"
-                }
-            }
+            # Handle both single image and list of images
+            if isinstance(image_object, list):
+                # Multiple images
+                image_base64_list = self.encode_images(image_object)
+                image_contents = []
+                for image_base64 in image_base64_list:
+                    image_contents.append({
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/png;base64,{image_base64}"
+                        }
+                    })
+            else:
+                # Single image
+                image_base64 = self.encode_image(image_object)
+                image_contents = [{
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/png;base64,{image_base64}"
+                    }
+                }]
         
         # Create message for OpenAI format
         message = {
             "role": "user",
-            "content": [
-                image_content,
-                {"type": "text", "text": prompt}
-            ]
+            "content": image_contents + [{"type": "text", "text": prompt}]
         }
         
         if history:

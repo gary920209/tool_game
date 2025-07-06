@@ -13,8 +13,4 @@ class ToolUseActionCheck(BaseModel):
     toolname: Literal["obj1", "obj2", "obj3"]
     position: List[float]
 
-class ToolUseVideoAction(BaseModel):
-    analysis: str
-    correct: bool
-    toolname: Literal["obj1", "obj2", "obj3"]
-    position: List[float]
+
