@@ -9,7 +9,7 @@ import argparse
 import copy
 from pyGameWorld.world import loadFromDict
 from pyGameWorld import PGWorld, ToolPicker
-from pyGameWorld.viewer import demonstrateTPPlacement, demonstrateWorld, saveWorld, demonstrateWorld_and_save_gif
+from pyGameWorld.viewer import demonstrateTPPlacement, demonstrateWorld, saveWorld, demonstrateWorld_and_save_video
 import numpy as np
 import pygame as pg
 from gemini_api import GeminiClient
@@ -120,35 +120,73 @@ def main(args):
     trial_limit = 5
     count = 1
     checked = False
+    invalid_attempts = 0  # Track consecutive invalid attempts
     img = 'round_0.png'  # Use the initial image for context
 
     while count <= trial_limit:
         # If action was invalid, ask for a corrected action via text prompt
         if invalid:
-            print("Invalid action detected. Asking Gemini to correct.")
-            prompt = prompt_invalid.replace('<PREDICTED_ACTION>', str(pred_action))
-            result = agent.inference_text(
-                prompt,
-                schema=ToolUseAction,
-                history=True
-            )
-            toolname = result['toolname']
-            position = result['position']
-            pred_action = {'toolname': toolname, 'position': position}
-            path_dict, success, time_to_success = tp.observePlacementPath(
-                toolname=toolname,
-                position=position,
-                maxtime=20.
-            )
-            invalid = path_dict is None
-            try:
-                demonstrateTPPlacement(tp, toolname, position, path=os.path.join(visuals_dir, f'round_{count}.png'))
-            except Exception as e:
-                print(f"Warning: Could not generate visualization: {e}")
-                # Fallback: save the current world state
-                current_world = loadFromDict(original_pgw_dict['world'])
-                saveWorld(current_world, os.path.join(visuals_dir, f'round_{count}.png'), original_pgw_dict['tools'])
-            save_json(result, path=os.path.join(responses_dir, f'round_{count}.json'))
+            invalid_attempts += 1
+            print(f"Invalid action detected (attempt {invalid_attempts}). Asking Gemini to correct.")
+            
+            # After 2 consecutive invalid attempts, show MP4 for better context
+            if invalid_attempts >= 2 and not checked:
+                print("Multiple invalid attempts. Showing video context for better understanding.")
+                world = loadFromDict(original_pgw_dict['world'])  # reset world state from original
+                video_path = os.path.join(visuals_dir, f'round_{count}_invalid_context.mp4')
+                demonstrateWorld_and_save_video(world, video_filename=video_path, max_frames=5)
+                prompt = prompt_video.replace('<PREDICTED_ACTION>', str(pred_action))
+                
+                # Check if the MP4 file exists before using it
+                if os.path.exists(video_path):
+                    print(f"Using MP4 for context: {video_path}")
+                    result = agent.inference_video(
+                        video_path,  
+                        prompt,
+                        schema=ToolUseVideoAction,  
+                        history=True
+                    )
+                else:
+                    print("Warning: MP4 file not found, using fallback text inference")
+                    prompt = prompt_invalid.replace('<PREDICTED_ACTION>', str(pred_action))
+                    result = agent.inference_text(
+                        prompt,
+                        schema=ToolUseAction,
+                        history=True
+                    )
+                checked = True  # Mark as checked to avoid repeating this
+            else:
+                # Standard invalid action correction
+                prompt = prompt_invalid.replace('<PREDICTED_ACTION>', str(pred_action))
+                result = agent.inference_text(
+                    prompt,
+                    schema=ToolUseAction,
+                    history=True
+                )
+            
+            if result is not None:
+                toolname = result['toolname']
+                position = result['position']
+                pred_action = {'toolname': toolname, 'position': position}
+                path_dict, success, time_to_success = tp.observePlacementPath(
+                    toolname=toolname,
+                    position=position,
+                    maxtime=20.
+                )
+                invalid = path_dict is None
+                if not invalid:
+                    invalid_attempts = 0  # Reset counter on valid action
+                try:
+                    demonstrateTPPlacement(tp, toolname, position, path=os.path.join(visuals_dir, f'round_{count}.png'))
+                except Exception as e:
+                    print(f"Warning: Could not generate visualization: {e}")
+                    # Fallback: save the current world state
+                    current_world = loadFromDict(original_pgw_dict['world'])
+                    saveWorld(current_world, os.path.join(visuals_dir, f'round_{count}.png'), original_pgw_dict['tools'])
+                save_json(result, path=os.path.join(responses_dir, f'round_{count}.json'))
+            else:
+                print("No result from agent, treating as invalid action")
+                invalid = True
 
         # If valid but not yet correct, optionally check with a second image prompt
         elif not success and not invalid and not checked:
@@ -184,33 +222,51 @@ def main(args):
         elif not success and checked:
             print("Still unsuccessful. Showing video context.")
             world = loadFromDict(original_pgw_dict['world'])  # reset world state from original
-            gif_path = os.path.join(visuals_dir, f'round_{count}.gif')
-            demonstrateWorld_and_save_gif(world, gif_filename=gif_path)
+            video_path = os.path.join(visuals_dir, f'round_{count}.mp4')
+            demonstrateWorld_and_save_video(world, video_filename=video_path, max_frames=5)
             prompt = prompt_video.replace('<PREDICTED_ACTION>', str(pred_action))
-            result = agent.inference_video(
-                os.path.join(visuals_dir, f'round_{count - 1}.png'),
-                prompt,
-                schema=ToolUseAction,
-                history=True
-            )
-            toolname = result['toolname']
-            position = result['position']
-            pred_action = {'toolname': toolname, 'position': position}
-            path_dict, success, time_to_success = tp.observePlacementPath(
-                toolname=toolname,
-                position=position,
-                maxtime=20.
-            )
-            invalid = path_dict is None
-            checked = False
-            try:
-                demonstrateTPPlacement(tp, toolname, position, path=os.path.join(visuals_dir, f'round_{count}.png'))
-            except Exception as e:
-                print(f"Warning: Could not generate visualization: {e}")
-                # Fallback: save the current world state
-                current_world = loadFromDict(original_pgw_dict['world'])
-                saveWorld(current_world, os.path.join(visuals_dir, f'round_{count}.png'), original_pgw_dict['tools'])
-            save_json(result, path=os.path.join(responses_dir, f'round_{count}.json'))
+            
+            # check if the MP4 file exists before using it
+            if os.path.exists(video_path):
+                result = agent.inference_video(
+                    video_path,  
+                    prompt,
+                    schema=ToolUseVideoAction,  
+                    history=True
+                )
+            else:
+                print("Warning: MP4 file not found, using fallback image inference")
+                # Fallback to the last image if MP4 is not available
+                fallback_image = os.path.join(visuals_dir, f'round_{count - 1}.png')
+                result = agent.inference_image(
+                    fallback_image,
+                    prompt,
+                    schema=ToolUseAction,
+                    history=True
+                )
+            
+            if result is not None:
+                toolname = result['toolname']
+                position = result['position']
+                pred_action = {'toolname': toolname, 'position': position}
+                path_dict, success, time_to_success = tp.observePlacementPath(
+                    toolname=toolname,
+                    position=position,
+                    maxtime=20.
+                )
+                invalid = path_dict is None
+                checked = False
+                try:
+                    demonstrateTPPlacement(tp, toolname, position, path=os.path.join(visuals_dir, f'round_{count}.png'))
+                except Exception as e:
+                    print(f"Warning: Could not generate visualization: {e}")
+                    # Fallback: save the current world state
+                    current_world = loadFromDict(original_pgw_dict['world'])
+                    saveWorld(current_world, os.path.join(visuals_dir, f'round_{count}.png'), original_pgw_dict['tools'])
+                save_json(result, path=os.path.join(responses_dir, f'round_{count}.json'))
+            else:
+                print("Warning: No result from agent, skipping this round")
+                invalid = True
 
         if success:
             print("Task solved!")
