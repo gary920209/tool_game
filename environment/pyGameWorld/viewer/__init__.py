@@ -2,7 +2,6 @@ from __future__ import division, print_function
 import pymunk as pm
 import pygame as pg
 import numpy as np
-import cv2
 from scipy.stats import multivariate_normal as mvnm
 from ..world import *
 from ..constants import *
@@ -14,7 +13,7 @@ import pdb
 __all__ = ['drawWorld', 'demonstrateWorld', 'demonstrateTPPlacement',
            'visualizePath', 'drawPathSingleImage', 'drawPathSingleImageWithTools', 'drawWorldWithTools', 'visualizeScreen', 'drawPathSingleImageBasic',
            'makeImageArray', 'makeImageArrayNoPath','drawTool', '_draw_line_gradient',
-           'drawMultiPathSingleImage', 'drawMultiPathSingleImageBasic', 'demonstrateWorld_and_save_video']
+           'drawMultiPathSingleImage', 'drawMultiPathSingleImageBasic']
 
 COLORS=[(255,0,255,255), (225,225,0, 255),(0, 255, 255, 255)]
 WHITE = (255, 255, 255, 255)
@@ -177,81 +176,12 @@ def demonstrateWorld(world, hz = 30.):
         pg.display.flip()
         clk.tick(hz)
         for e in pg.event.get():
-            if e.type == pg.QUIT:
+            if e.type == QUIT:
                 running = False
         if dispFinish and world.checkEnd():
             print("Goal accomplished")
             dispFinish = False
     pg.quit()
-
-from PIL import Image
-import pygame as pg
-import os
-
-def demonstrateWorld_and_save_video(world, video_filename="simulation.mp4", hz=30., max_frames=5):
-    print(f"🎬 Starting MP4 video generation: {video_filename}")
-    print(f"   Parameters: hz={hz}, max_frames={max_frames}")
-    
-    pg.init()
-    sc = pg.display.set_mode(world.dims)
-    clk = pg.time.Clock()
-    tps = 1. / hz
-    frames = []
-
-    # Always capture the initial state
-    sc.blit(drawWorld(world), (0, 0))
-    pg.display.flip()
-    raw_data = pg.image.tostring(sc, 'RGB')  
-    img = Image.frombytes('RGB', sc.get_size(), raw_data)
-    # Convert PIL image to numpy array for OpenCV
-    frame_array = np.array(img)
-    frames.append(frame_array)
-    print(f"   Captured initial frame (total: {len(frames)})")
-
-    # 只錄製指定數量的幀或直到動作結束
-    for frame_idx in range(max_frames - 1):  # -1 因為已經有初始幀
-        world.step(tps)
-        sc.blit(drawWorld(world), (0, 0))
-        pg.display.flip()
-        clk.tick(hz)
-
-        # screen to PIL Image then to numpy array
-        raw_data = pg.image.tostring(sc, 'RGB')
-        img = Image.frombytes('RGB', sc.get_size(), raw_data)
-        frame_array = np.array(img)
-        frames.append(frame_array)
-        
-        print(f"   Captured frame {len(frames)}/{max_frames}")
-
-        # 檢查動作是否完成
-        if world.checkEnd():
-            print(f"Goal accomplished at frame {len(frames)}")
-            break
-
-    pg.quit()
-
-    # save frames as MP4 video
-    if frames and len(frames) > 1:
-        height, width, layers = frames[0].shape
-        
-        # Define the codec and create VideoWriter object
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        out = cv2.VideoWriter(video_filename, fourcc, hz, (width, height))
-        
-        for frame in frames:
-            # OpenCV uses BGR, but our frames are RGB, so we need to convert
-            frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-            out.write(frame_bgr)
-        
-        out.release()
-        print(f"Simulation MP4 saved to {video_filename} with {len(frames)} frames at {hz} fps")
-    else:
-        print(f"Warning: Only {len(frames)} frame(s) captured. Creating static image instead.")
-        if frames:
-            frame_pil = Image.fromarray(frames[0])
-            frame_pil.save(video_filename.replace('.mp4', '.png'))
-            print(f"Static image saved to {video_filename.replace('.mp4', '.png')}")
-
 
 def _draw_tool(surface, tool_points, topleft, color=(255, 0, 0)):
     """
@@ -295,7 +225,7 @@ def saveWorld(world, filename,tools):
     pg.quit()
     return pil_img
 
-def demonstrateTPPlacement(toolpicker, toolname, position, path, maxtime=20.,
+def demonstrateTPPlacement(toolpicker, toolname, position, maxtime=20.,
                            noise_dict=None, hz=30.):
     tps = 1./hz
     toolpicker.bts = tps
@@ -304,17 +234,9 @@ def demonstrateTPPlacement(toolpicker, toolname, position, path, maxtime=20.,
     else:
         pth, ocm, etime, wd = toolpicker.observeFullPlacementPath(toolname, position, maxtime, returnDict=True)
     
-    # Handle the case where path is None (invalid action)
-    if pth is None or wd is None:
-        print("Path or world data is None - creating static image instead")
-        # Create a static image of the current world state
-        world = loadFromDict(toolpicker.world.genDesc())
-        pg.init()
-        sc = pg.display.set_mode(world.dims)
-        sc.blit(drawWorld(world), (0, 0))
-        pg.display.flip()
-        pg.image.save(sc, path)
-        pg.quit()
+    # Check if placement failed (wd is None)
+    if wd is None:
+        print("Tool placement failed - collision detected or invalid position")
         return
     
     world = loadFromDict(wd)
@@ -328,21 +250,20 @@ def demonstrateTPPlacement(toolpicker, toolname, position, path, maxtime=20.,
     t = 0
     i = 0
     dispFinish = True
-    while t < etime and i < len(pth[list(pth.keys())[0]][0]):
+    while t < etime:
         for onm, o in world.objects.items():
-            if not o.isStatic() and onm in pth:
-                if len(pth[onm]) >= 2 and len(pth[onm][0]) > i:
-                    o.setPos(pth[onm][0][i])
-                    o.setRot(pth[onm][1][i])
+            if not o.isStatic():
+                o.setPos(pth[onm][0][i])
+                o.setRot(pth[onm][1][i])
         i += 1
         t += tps
         sc.blit(drawWorld(world), (0,0))
         pg.display.flip()
         for e in pg.event.get():
-            if e.type == pg.QUIT:
+            if e.type == QUIT:
                 pg.quit()
                 return
-    pg.image.save(sc, path)  
+    pg.image.save(sc, "final_snapshot.png")  
     pg.quit()
 
 def visualizePath(worlddict, path, hz=30.):
@@ -370,13 +291,13 @@ def visualizePath(worlddict, path, hz=30.):
         sc.blit(drawWorld(world), (0,0))
         pg.display.flip()
         for e in pg.event.get():
-            if e.type == pg.QUIT:
+            if e.type == QUIT:
                 pg.quit()
                 return
         clk.tick(hz)
     pg.quit()
 
-def makeImageArray(worlddict, path, sample_ratio=1):
+def makeImageArray(worlddict, path, sample_ratio=50):
     world = loadFromDict(worlddict)
     #pg.init()
     images = [drawWorld(world)]
